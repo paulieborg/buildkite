@@ -13,6 +13,25 @@ Resources:
         - Name: Queue
           Value: $(BuildkiteQueue)
       ComparisonOperator: LessThanOrEqualToThreshold
+
+  ScheduledActionAgentUp:
+    Type: AWS::AutoScaling::ScheduledAction
+    Properties:
+      AutoScalingGroupName: $(AgentAutoScaleGroup)
+      MaxSize: $(MaxSize)
+      MinSize: $(ScheduledUpMinSize)
+      DesiredCapacity: $(ScheduledUpDesiredSize)
+      Recurrence: $(ScheduledUpRecurrence)
+
+  ScheduledActionAgentDown:
+    Type: AWS::AutoScaling::ScheduledAction
+    Properties:
+      AutoScalingGroupName: $(AgentAutoScaleGroup)
+      MaxSize: $(MaxSize)
+      MinSize: $(ScheduledDownMinSize)
+      DesiredCapacity: $(ScheduledDownDesiredSize)
+      Recurrence: $(ScheduledDownRecurrence)
+
   AgentScaleUpPolicy:
     Type: AWS::AutoScaling::ScalingPolicy
     Properties:

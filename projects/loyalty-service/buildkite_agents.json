@@ -1,0 +1,58 @@
+[
+  {
+    "ParameterKey": "BuildkiteAgentToken",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "BuildkiteApiAccessToken",
+    "UsePreviousValue": true
+  },
+  {
+    "ParameterKey": "BuildkiteOrgSlug",
+    "ParameterValue": "myob"
+  },
+  {
+    "ParameterKey": "AvailabilityZones",
+    "ParameterValue": "ap-southeast-2a,ap-southeast-2b,ap-southeast-2c"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.medium"
+  },
+  {
+    "ParameterKey": "MinSize",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "AgentsPerInstance",
+    "ParameterValue": "2"
+  },
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "juno_buildkite_agent"
+  },
+  {
+    "ParameterKey": "BuildkiteQueue",
+    "ParameterValue": "juno-dev"
+  },
+  {
+    "ParameterKey": "ScaleUpAdjustment",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "SecretsBucket",
+    "ParameterValue": "juno-buildkite-dev"
+  },
+  {
+    "ParameterKey": "ArtifactsBucket",
+    "ParameterValue": "juno-buildkite-artifacts-dev"
+  },
+  {
+    "ParameterKey": "ManagedPolicyArns",
+    "ParameterValue": "arn:aws:iam::384159015021:policy/juno-buildkite-resources-DeployerPolicy-15TGS7OJWVZXR"
+  },
+  {
+    "ParameterKey": "AuthorizedUsersS3Path",
+    "ParameterValue": "s3://juno-buildkite-dev/authorized_keys"
+  }
+]
