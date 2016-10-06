@@ -1,0 +1,593 @@
+## Provides the infrastructure for a scalable buildkite cluster
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Buildkite Configuration
+        Parameters:
+        - BuildkiteAgentRelease
+        - BuildkiteAgentToken
+        - BuildkiteQueue
+        - BuildkiteOrgSlug
+        - BuildkiteApiAccessToken
+
+      - Label:
+          default: Network Configuration
+        Parameters:
+        - VpcId
+        - Subnets
+        - AvailabilityZones
+        - SecurityGroupId
+        - ManagedPolicyArns
+
+      - Label:
+          default: Instance Configuration
+        Parameters:
+        - ImageId
+        - InstanceType
+        - AgentsPerInstance
+        - KeyName
+        - SpotPrice
+        - SecretsBucket
+        - ArtifactsBucket
+        - AuthorizedUsersUrl
+        - AuthorizedUsersS3Path
+        - BootstrapScriptUrl
+        - RootVolumeSize
+
+      - Label:
+          default: Auto-scaling Configuration
+        Parameters:
+        - MinSize
+        - MaxSize
+        - ScaleUpAdjustment
+        - ScaleDownAdjustment
+        - AutoscaleStrategy
+        - ScheduledUpRecurrence
+        - ScheduledUpDesiredSize
+        - ScheduledUpMinSize
+        - ScheduledDownRecurrence
+        - ScheduledDownDesiredSize
+        - ScheduledDownMinSize
+
+Parameters:
+  KeyName:
+    Description: The ssh keypair used to access the buildkite instances
+    Type: AWS::EC2::KeyPair::KeyName
+    MinLength: 1
+
+  BuildkiteAgentRelease:
+    Type: String
+    AllowedValues:
+      - stable
+      - unstable
+      - experimental
+    Default: "stable"
+
+  BuildkiteAgentToken:
+    Description: Your Buildkite Agent token
+    Type: String
+    NoEcho: true
+    MinLength: 1
+
+  BuildkiteOrgSlug:
+    Description: Optional Buildkite organization slug (required for autoscaling metrics)
+    Type: String
+
+  BuildkiteApiAccessToken:
+    Description: Optional Buildkite API access token with read_pipelines, read_builds and read_agents (required for autoscaling metrics)
+    Type: String
+    NoEcho: true
+
+  BuildkiteQueue:
+    Description: Queue name that agents will use, targeted in pipeline steps using "queue={value}"
+    Type: String
+    Default: default
+    MinLength: 1
+
+  AgentsPerInstance:
+    Description: Number of Buildkite agents to run on each instance
+    Type: Number
+    Default: 1
+    MinValue: 1
+
+  SecretsBucket:
+    Description: Optional - name of an existing S3 bucket containing pipeline secrets
+    Type: String
+    Default: ""
+
+  ArtifactsBucket:
+    Description: Optional - name of an existing S3 bucket for build artifact storage
+    Type: String
+    Default: ""
+
+  AuthorizedUsersUrl:
+    Description: Optional - S3 url to periodically download ssh authorized_keys from
+    Type: String
+    Default: ""
+
+  AuthorizedUsersS3Path:
+    Description: Optional - S3 path to periodically copy ssh authorized_keys from
+    Type: String
+    Default: ""
+
+  BootstrapScriptUrl:
+    Description: Optional - S3 url to run on each instance during boot
+    Type: String
+    Default: ""
+
+  VpcId:
+    Type: String
+    Description: Optional - VPC Id of existing VPC. Leave blank to have a new VPC created
+    Default: ""
+
+  Subnets:
+    Type: CommaDelimitedList
+    Description: Optional - Comma separated list of three existing VPC Subnet Ids where EC2 instances will run.  Required if setting VpcId.
+    Default: ""
+
+  AvailabilityZones:
+    Type: CommaDelimitedList
+    Description: Optional - Comma-delimited list of VPC availability zones in which to create subnets. Required if setting VpcId.
+    Default: ""
+
+  InstanceType:
+    Description: The type of instance to use for the agent
+    Type: String
+    Default: t2.nano
+    MinLength: 1
+
+  SpotPrice:
+    Description: Optional - Spot price to use for the agents. 0 means normal (non-spot) instances are used
+    Type: String
+    Default: 0
+
+  MaxSize:
+    Description: The maximum number of agents to launch
+    Type: Number
+    Default: 10
+    MinValue: 1
+
+  MinSize:
+    Description: The minumum number of agents to launch
+    Type: Number
+    Default: 0
+
+  ScheduledUpRecurrence:
+    Description: The Unix cron expression for bring up more agents, e.g. bring up agents at 8 AM everyday
+    Type: String
+    Default: 0 21 * * *
+
+  ScheduledUpDesiredSize:
+    Description: The desired size for bring up more agents
+    Type: Number
+    Default: 1
+
+  ScheduledUpMinSize:
+    Description: The min size for bring up more agents
+    Type: Number
+    Default: 1
+
+  ScheduledDownRecurrence:
+    Description: The Unix cron expression for non-busy time, e.g. shut down agents at 8 PM everyday
+    Type: String
+    Default: 0 9 * * *
+
+  ScheduledDownDesiredSize:
+    Description: The desired size of agents for non-busy time
+    Type: Number
+    Default: 0
+
+  ScheduledDownMinSize:
+    Description: The min size of agents for non-busy time
+    Type: Number
+    Default: 0
+
+  ScaleUpAdjustment:
+    Description: The number of agents to adjust by on each scale up event (ScheduledJobsCount > 0 for 1 min)
+    Type: Number
+    Default: 5
+    MinValue: 0
+
+  ScaleDownAdjustment:
+    Description: The number of agents to remove on each scale down event (UnfinishedJobs == 0 for 30 mins)
+    Type: Number
+    Default: -1
+    MaxValue: 0
+
+  RootVolumeSize:
+    Description: Size of EBS volume for root filesystem in GB.
+    Type: Number
+    Default: 250
+    MinValue: 10
+
+  SecurityGroupId:
+    Type: String
+    Description: Optional - Existing security group to associate the container instances. Creates one by default.
+    Default: ""
+
+  ManagedPolicyArns:
+    Type: CommaDelimitedList
+    Description: Optional - ARNs of existing managed IAM policies to associate with the container instances.
+    Default: ""
+
+  ImageId:
+    Type: String
+    Description: Optional - The AMI to use, otherwise uses the mapping built in
+    Default: ""
+
+Conditions:
+    UseSpotInstances:
+      !Not [ !Equals [ $(SpotPrice), 0 ] ]
+
+    CreateVpcResources:
+      !Equals [ $(VpcId), "" ]
+
+    CreateSecurityGroup:
+      !Equals [ $(SecurityGroupId), "" ]
+
+    UseSpecifiedAvailabilityZones:
+      !Not [ !Equals [ !Join [ "", $(AvailabilityZones) ], "" ]  ]
+
+    UseSecretsBucket:
+      !Not [ !Equals [ $(SecretsBucket), "" ] ]
+
+    UseArtifactsBucket:
+      !Not [ !Equals [ $(ArtifactsBucket), "" ] ]
+
+    UseDefaultAMI:
+      !Equals [ $(ImageId), "" ]
+
+    CreateMetricsStack:
+      !Not [ !Equals [ $(BuildkiteApiAccessToken), "" ] ]
+
+    UseSpecifiedIamPolicies:
+      !Not [ !Equals [ !Join [ "", $(ManagedPolicyArns) ], "" ]  ]
+
+Resources:
+  # Allow ec2 instances to assume a role and be granted the IAMPolicies
+  IAMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [ $(IAMRole) ]
+
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns: !If [ "UseSpecifiedIamPolicies", $(ManagedPolicyArns), '$(AWS::NoValue)' ]
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ ec2.amazonaws.com ]
+            Action: sts:AssumeRole
+      Path: /
+
+  IAMPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: InstancePolicy
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - cloudwatch:PutMetricData
+              - cloudformation:DescribeStackResource
+              - ec2:DescribeTags
+              - autoscaling:DescribeAutoScalingInstances
+              - autoscaling:DescribeLifecycleHooks
+              - autoscaling:RecordLifecycleActionHeartbeat
+              - autoscaling:CompleteLifecycleAction
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogStreams
+            Resource: "*"
+
+      Roles:
+        - $(IAMRole)
+
+  SecretsBucketPolicies:
+    Type: AWS::IAM::Policy
+    Condition: UseSecretsBucket
+    Properties:
+      PolicyName: SecretsBucketPolicy
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:Get*
+              - s3:Get
+              - s3:List*
+            Resource:
+              - "arn:aws:s3:::$(SecretsBucket)/*"
+              - "arn:aws:s3:::$(SecretsBucket)"
+      Roles:
+        - $(IAMRole)
+
+  ArtifactsBucketPolicies:
+    Type: AWS::IAM::Policy
+    Condition: UseArtifactsBucket
+    Properties:
+      PolicyName: ArtifactsBucketPolicy
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:Put*
+              - s3:List*
+            Resource:
+              - "arn:aws:s3:::$(ArtifactsBucket)/*"
+              - "arn:aws:s3:::$(ArtifactsBucket)"
+      Roles:
+        - $(IAMRole)
+
+  AgentLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true
+      SecurityGroups: [ !If [ "CreateSecurityGroup", $(SecurityGroup), $(SecurityGroupId) ] ]
+      KeyName : $(KeyName)
+      IamInstanceProfile: $(IAMInstanceProfile)
+      InstanceType: $(InstanceType)
+      SpotPrice: !If [ "UseSpotInstances", $(SpotPrice), '$(AWS::NoValue)' ]
+      ImageId : !If [
+        "UseDefaultAMI",
+        "$(AWSRegion2AMI[$(AWS::Region)][AMI])",
+        $(ImageId)
+      ]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: { VolumeSize: $(RootVolumeSize), VolumeType: gp2 }
+      UserData: !Base64 |
+        #!/bin/bash -xv
+        /opt/aws/bin/cfn-init \
+          --region "$(AWS::Region)" \
+          --stack "$(AWS::StackId)" \
+          --resource "AgentLaunchConfiguration"
+        /opt/aws/bin/cfn-signal \
+          --region "$(AWS::Region)" \
+          --stack "$(AWS::StackName)" \
+          --resource "AgentAutoScaleGroup" \
+          --exit-code \$?
+        # Here we put any params we want to trigger a restart
+        # $(BuildkiteAgentToken)
+        # $(BuildkiteAgentRelease)
+        # $(BuildkiteQueue)
+        # $(AgentsPerInstance)
+        # $(SecretsBucket)
+        # $(BootstrapScriptUrl)
+
+    Metadata:
+      # see http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-init.html
+      AWS::CloudFormation::Init:
+        config:
+          commands:
+            01-write-buildkite-env:
+              command: |
+                #!/bin/bash -eu
+
+                cat << EOF > /var/lib/buildkite-agent/cfn-env
+                BUILDKITE_STACK_NAME="$(AWS::StackName)"
+                BUILDKITE_SECRETS_BUCKET="$(SecretsBucket)"
+                BUILDKITE_AGENTS_PER_INSTANCE="$(AgentsPerInstance)"
+                EOF
+
+                chown buildkite-agent /var/lib/buildkite-agent/cfn-env
+
+            02-restart-docker:
+              command: |
+                #!/bin/bash -eu
+
+                # Sometimes Docker can be unreponsive:
+                # https://github.com/docker/docker/issues/23131
+                # https://github.com/buildkite/elastic-ci-stack-for-aws/issues/86
+                #
+                # As a workaround we start the docker daemon, wait 10 seconds, and verify
+                service docker start || ( cat /var/log/docker && false )
+                sleep 10 && docker info
+
+            03-install-buildkite:
+              command: |
+                #!/bin/bash -eu
+
+                # Choose the right binary
+                ln -s /usr/bin/buildkite-agent-$(BuildkiteAgentRelease) /usr/bin/buildkite-agent
+
+                # Setup the buildkite-agent config
+                INSTANCE_ID=\$(/opt/aws/bin/ec2-metadata --instance-id | cut -d " " -f 2)
+                DOCKER_VERSION=\$(docker --version | cut -f3 -d' ' | sed 's/,//')
+
+                # Once 3.0 is stable we can just remove this and let the agent do the right thing
+                if [[ "$(BuildkiteAgentRelease)" == "stable" ]]; then
+                  BOOTSTRAP_SCRIPT="/etc/buildkite-agent/bootstrap.sh"
+                else
+                  BOOTSTRAP_SCRIPT="buildkite-agent bootstrap"
+                fi;
+
+                cat << EOF > /etc/buildkite-agent/buildkite-agent.cfg
+                name="$(AWS::StackName)-\$INSTANCE_ID-%n"
+                token="$(BuildkiteAgentToken)"
+                meta-data=\$(printf 'queue=%s,docker=%s,stack=%s,buildkite-aws-stack' "$(BuildkiteQueue)" "\$DOCKER_VERSION" "$(AWS::StackName)")
+                meta-data-ec2=true
+                bootstrap-script="\$BOOTSTRAP_SCRIPT"
+                hooks-path=/etc/buildkite-agent/hooks
+                build-path=/var/lib/buildkite-agent/builds
+                plugins-path=/var/lib/buildkite-agent/plugins
+                EOF
+
+                chown buildkite-agent: /etc/buildkite-agent/buildkite-agent.cfg
+
+                # Setup logging first so we capture everything
+                for i in \$(seq 1 $(AgentsPerInstance)); do
+                  touch /var/log/buildkite-agent-\${i}.log
+
+                  cat << EOF > /etc/awslogs/config/buildkite-agent-\${i}.conf
+                [/var/log/buildkite-agent-\${i}.log]
+                file = /var/log/buildkite-agent-\${i}.log
+                log_group_name = /var/log/buildkite-agent.log
+                log_stream_name = {instance_id}-\${i}
+                datetime_format = %Y-%m-%d %H:%M:%S
+                EOF
+                done
+
+                service awslogs restart
+
+
+            04-fetch-authorized-users:
+              test: test -n "$(AuthorizedUsersUrl)"
+              command: |
+                #!/bin/bash -eu
+
+                cat << EOF > /etc/cron.hourly/authorized_keys
+                curl --silent -f "$(AuthorizedUsersUrl)" > /tmp/authorized_keys
+                mv /tmp/authorized_keys /home/ec2-user/.ssh/authorized_keys
+                chmod 600 /home/ec2-user/.ssh/authorized_keys
+                chown ec2-user: /home/ec2-user/.ssh/authorized_keys
+                EOF
+
+                chmod +x /etc/cron.hourly/authorized_keys
+
+                /etc/cron.hourly/authorized_keys
+
+            04-fetch-authorized-users-s3:
+              test: test -n "$(AuthorizedUsersS3Path)"
+              command: |
+                #!/bin/bash -eu
+
+                cat << EOF > /etc/cron.hourly/authorized_keys
+                aws s3 cp "$(AuthorizedUsersS3Path)" /tmp/authorized_keys
+
+                touch /home/ec2-user/.ssh/authorized_keys
+                cp /home/ec2-user/.ssh/authorized_keys /tmp/original_keys
+                (cat /tmp/original_keys; echo; cat /tmp/authorized_keys; echo) | sort | uniq > /home/ec2-user/.ssh/authorized_keys
+
+                chmod 600 /home/ec2-user/.ssh/authorized_keys
+                chown ec2-user: /home/ec2-user/.ssh/authorized_keys
+                EOF
+
+                chmod +x /etc/cron.hourly/authorized_keys
+
+                /etc/cron.hourly/authorized_keys
+
+            05-run-bootstrap-script:
+              test: test -n "$(BootstrapScriptUrl)"
+              command: |
+                #!/bin/bash -eu
+
+                curl -sSL "$(BootstrapScriptUrl)" | bash
+
+            06-start-the-world:
+              command: |
+                #!/bin/bash -eu
+
+                # Start services
+
+                for i in \$(seq 1 $(AgentsPerInstance)); do
+                  cp /etc/buildkite-agent/init.d.tmpl /etc/init.d/buildkite-agent-\${i}
+                  service buildkite-agent-\${i} start
+                  chkconfig --add buildkite-agent-\${i}
+                done
+
+                # Make sure terminationd is started if it isn't
+                start terminationd || true
+
+  # XXX: We don't even want a topic or role, but CloudFormation requires them
+  # to create a lifecycle hook.
+  AgentLifecycleTopic:
+    Type: AWS::SNS::Topic
+
+  AgentLifecycleHookRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ autoscaling.amazonaws.com ]
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AgentLifecyclePolicy
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: $(AgentLifecycleTopic)
+      Path: /
+
+  AgentLifecycleHook:
+    Type: AWS::AutoScaling::LifecycleHook
+    Properties:
+      AutoScalingGroupName: $(AgentAutoScaleGroup)
+      LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+      DefaultResult: CONTINUE
+      NotificationTargetARN: $(AgentLifecycleTopic)
+      RoleARN: $(AgentLifecycleHookRole[Arn])
+
+  AgentAutoScaleGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !If [
+        "CreateVpcResources",
+        [ $(Subnet0), $(Subnet1), $(Subnet2) ],
+        $(Subnets)
+      ]
+      LaunchConfigurationName: $(AgentLaunchConfiguration)
+      MinSize: $(MinSize)
+      MaxSize: $(MaxSize)
+      MetricsCollection:
+        - Granularity: 1Minute
+          Metrics:
+            - GroupMinSize
+            - GroupMaxSize
+            - GroupInServiceInstances
+            - GroupTerminatingInstances
+            - GroupPendingInstances
+      TerminationPolicies:
+        - OldestLaunchConfiguration
+        - ClosestToNextInstanceHour
+      Tags:
+        - Key: Role
+          Value: buildkite-agent
+          PropagateAtLaunch: true
+        - Key: Name
+          Value: buildkite-agent
+          PropagateAtLaunch: true
+        - Key: BuildkiteAgentRelease
+          Value: $(BuildkiteAgentRelease)
+          PropagateAtLaunch: true
+        - Key: BuildkiteQueue
+          Value: $(BuildkiteQueue)
+          PropagateAtLaunch: true
+
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+        Count: $(MinSize)
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: $(MinSize)
+        MaxBatchSize: 5
+        # On rollback this might have to wait for an agent to finish
+        # a job. The agent's init script waits 30 minutes, so we wait
+        # a maximum of 40 minutes to be safe.
+        PauseTime: PT40M
+        WaitOnResourceSignals: true
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateSecurityGroup
+    Properties:
+      GroupDescription: Enable access to SSH
+      VpcId: !If [ "CreateVpcResources", $(Vpc), $(VpcId) ]
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0

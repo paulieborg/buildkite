@@ -1,0 +1,22 @@
+Mappings:
+  AWSRegion2AMI:
+    us-east-1:
+      AMI: ami-16e99001
+    us-west-1:
+      AMI: ami-9ff5baff
+    us-west-2:
+      AMI: ami-7dad711d
+    eu-west-1:
+      AMI: ami-f6cbb085
+    eu-central-1:
+      AMI: ami-871fe2e8
+    ap-northeast-1:
+      AMI: ami-4a36e52b
+    ap-northeast-2:
+      AMI: ami-2f5e8b41
+    ap-southeast-1:
+      AMI: ami-7f80251c
+    ap-southeast-2:
+      AMI: ami-dc1828bf
+    sa-east-1:
+      AMI: ami-36b7245a

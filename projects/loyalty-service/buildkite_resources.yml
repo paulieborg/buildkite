@@ -1,0 +1,44 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Resources for Buildkite agents
+
+Resources:
+  DeployerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Permissions to run deploy from buildkite agent's docker
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - apigateway:*
+          - lambda:*
+          - cloudformation:*
+          - iam:GetRole
+          - iam:ListRolePolicies
+          - iam:PutRolePolicy
+          - iam:CreateRole
+          - iam:PassRole
+          - ec2:Describe*
+          - s3:*
+          Resource: "*"
+
+  SecurityBucket:
+    Type: AWS::S3::Bucket
+    Description: Save Security keys
+    Properties:
+      AccessControl: Private
+      BucketName: juno-buildkite-dev
+
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Description: Save Artifacts
+    Properties:
+      AccessControl: Private
+      BucketName: juno-buildkite-artifacts-dev
+
+Outputs:
+  DeployerPolicy:
+    Value: !Ref DeployerPolicy
+    Export:
+      Name: juno-buildkite-resources-dev-deployer-policy
