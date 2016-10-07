@@ -28,5 +28,5 @@ This repository contains customized buildkite agents templates
     bundle install
 
     mkdir -p target
-    cfoo templates/*.yml templates/mappings.yml.template > target/aws-stack.json
+    cfoo templates/official/*.yml templates/*.yml > target/aws-stack.json
     
