@@ -4,7 +4,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ROOT_DIR="$SCRIPT_DIR/../.."
 TARGET_DIR="$ROOT_DIR/target"
 
-(cd $ROOT_DIR && mkdir -p $TARGET_DIR && cfoo templates/*.yml > $TARGET_DIR/aws-stack.json)
+(cd $ROOT_DIR && mkdir -p $TARGET_DIR && cfoo templates/official/*.yml templates/*.yml > $TARGET_DIR/aws-stack.json)
 
 # to use the official template: --template-url "https://s3.amazonaws.com/buildkite-aws-stack/aws-stack.json"
 
