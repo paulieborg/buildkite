@@ -49,7 +49,7 @@
   },
   {
     "ParameterKey": "ManagedPolicyArns",
-    "ParameterValue": "arn:aws:iam::384159015021:policy/example-buildkite-resources-DeployerPolicy-15TGS7OJWVZXR"
+    "ParameterValue": "arn:aws:iam::1234567890:policy/example-buildkite-resources-DeployerPolicy-123456790"
   },
   {
     "ParameterKey": "AuthorizedUsersUrl",

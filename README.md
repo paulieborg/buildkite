@@ -13,7 +13,7 @@ This repository contains customized buildkite agents templates
   NOTE: If there's build task waiting for agents, it will bring up agents as needed during night(default behavior of original template).
   
 - Copy authorized_keys from s3 bucket and merge with the local file, which allows multiple user remote ssh login
-  Specify value for parameter: AuthorizedUsersS3Path, the EC2 instance will copy and merge authorized_keys at:
+  Specify value for parameter: AuthorizedUsersUrl, the EC2 instance will copy and merge authorized_keys at:
   - Instance startup
   - Each hour
   
