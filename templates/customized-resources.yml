@@ -3,11 +3,6 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: Multiple User Login Configuration
-        Parameters:
-        - AuthorizedUsersS3Path
-
-      - Label:
           default: Scheduled Action for Auto-scaling Group
         Parameters:
         - ScheduledUpRecurrence
@@ -18,11 +13,6 @@ Metadata:
         - ScheduledDownMinSize
 
 Parameters:
-  AuthorizedUsersS3Path:
-    Description: Optional - S3 path to periodically copy ssh authorized_keys from
-    Type: String
-    Default: ""
-
   ScheduledUpRecurrence:
     Description: The Unix cron expression for bring up more agents, e.g. bring up agents at 8 AM everyday
     Type: String
@@ -60,13 +50,18 @@ Resources:
       AWS::CloudFormation::Init:
         config:
           commands:
-            04-fetch-authorized-users-s3-new:
-              test: test -n "$(AuthorizedUsersS3Path)"
+            04-fetch-authorized-users-s3:
+              test: test -n "$(AuthorizedUsersUrl)"
               command: |
                 #!/bin/bash -eu
 
                 cat << EOF > /etc/cron.hourly/authorized_keys
-                aws s3 cp "$(AuthorizedUsersS3Path)" /tmp/authorized_keys
+                case "$(AuthorizedUsersUrl)" in
+                    s3://*)
+                      aws s3 cp "$(AuthorizedUsersUrl)" /tmp/authorized_keys;;
+                    *)
+                      curl --silent -f "$(AuthorizedUsersUrl)" > /tmp/authorized_keys;;
+                esac
 
                 if [ ! -f /home/ec2-user/.ssh/original_authorized_keys ]; then
                    cp /home/ec2-user/.ssh/authorized_keys /home/ec2-user/.ssh/original_authorized_keys

@@ -8,6 +8,6 @@ TARGET_DIR="$ROOT_DIR/target"
 
 # to use the official template: --template-url "https://s3.amazonaws.com/buildkite-aws-stack/aws-stack.json"
 
-aws cloudformation update-stack --output text --stack-name juno-buildkite-dev \
+aws cloudformation update-stack --output text --stack-name example-buildkite-dev \
   --template-body file://$TARGET_DIR/aws-stack.json \
   --capabilities CAPABILITY_IAM --parameters file://$SCRIPT_DIR/buildkite_agents.json

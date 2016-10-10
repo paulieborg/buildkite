@@ -28,17 +28,17 @@ Resources:
     Description: Save Security keys
     Properties:
       AccessControl: Private
-      BucketName: juno-buildkite-dev
+      BucketName: example-buildkite-dev
 
   ArtifactBucket:
     Type: AWS::S3::Bucket
     Description: Save Artifacts
     Properties:
       AccessControl: Private
-      BucketName: juno-buildkite-artifacts-dev
+      BucketName: example-buildkite-artifacts-dev
 
 Outputs:
   DeployerPolicy:
     Value: !Ref DeployerPolicy
     Export:
-      Name: juno-buildkite-resources-dev-deployer-policy
+      Name: example-buildkite-resources-dev-deployer-policy

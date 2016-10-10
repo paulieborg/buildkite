@@ -398,7 +398,7 @@ Resources:
 
 
             04-fetch-authorized-users:
-              test: test -n "$(AuthorizedUsersUrl)"
+              test: test [ -n "$(AuthorizedUsersUrl)" ] && [ -z "$(AuthorizedUsersUrl)" ];
               command: |
                 #!/bin/bash -eu
 

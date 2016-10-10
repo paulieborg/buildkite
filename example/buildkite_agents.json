@@ -29,11 +29,11 @@
   },
   {
     "ParameterKey": "KeyName",
-    "ParameterValue": "juno_buildkite_agent"
+    "ParameterValue": "example_buildkite_agent"
   },
   {
     "ParameterKey": "BuildkiteQueue",
-    "ParameterValue": "juno-dev"
+    "ParameterValue": "example-dev"
   },
   {
     "ParameterKey": "ScaleUpAdjustment",
@@ -41,18 +41,18 @@
   },
   {
     "ParameterKey": "SecretsBucket",
-    "ParameterValue": "juno-buildkite-dev"
+    "ParameterValue": "example-buildkite-dev"
   },
   {
     "ParameterKey": "ArtifactsBucket",
-    "ParameterValue": "juno-buildkite-artifacts-dev"
+    "ParameterValue": "example-buildkite-artifacts-dev"
   },
   {
     "ParameterKey": "ManagedPolicyArns",
-    "ParameterValue": "arn:aws:iam::384159015021:policy/juno-buildkite-resources-DeployerPolicy-15TGS7OJWVZXR"
+    "ParameterValue": "arn:aws:iam::384159015021:policy/example-buildkite-resources-DeployerPolicy-15TGS7OJWVZXR"
   },
   {
-    "ParameterKey": "AuthorizedUsersS3Path",
-    "ParameterValue": "s3://juno-buildkite-dev/authorized_keys"
+    "ParameterKey": "AuthorizedUsersUrl",
+    "ParameterValue": "s3://example-buildkite-dev/authorized_keys"
   }
 ]
