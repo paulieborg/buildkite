@@ -47,6 +47,6 @@ https://buildkite.com/docs/agent/hooks
       exit 1
     fi
 
-
+*This is also available on MYOB Confluence https://myobconfluence.atlassian.net/wiki/display/DC/Lock+Down+BuildKite+Agents+per+Pipeline*
 
 
