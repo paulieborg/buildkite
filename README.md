@@ -30,3 +30,5 @@ This repository contains customized buildkite agents templates
     mkdir -p target
     cfoo templates/official/*.yml templates/*.yml > target/aws-stack.json
     
+## How to lock down agents
+[SecuringAgents](SecuringAgents.md)
